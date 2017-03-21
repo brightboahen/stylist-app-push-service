@@ -13,6 +13,8 @@ var options = {
 
 var apnProvider = new apn.Provider(options);
 
+var GcmClient = require('./src/GcmClient');
+
 //const PushNotificationClient = require('./src/pushNotificationClient.js').PushClient;
 
 module.exports.pushNotificationToTechWithToken = (event, context, callback) => {
@@ -29,20 +31,48 @@ module.exports.pushNotificationToTechWithToken = (event, context, callback) => {
         console.log('PushClient received this token', deviceToken);
         console.log('PushClient received this device type', deviceType);
 
-        if(deviceToken !== '' || deviceToken !== undefined){
-            //const deviceType = (deviceType !== undefined || deviceType !=='' ) ? deviceType : 1;
-            sendNotification(deviceToken)
-                .then( (results) => {
-                    console.log('results', results);
-                    const sent = results.sent;
-                    const failed = results.failed;
-                    if(sent && sent.length >= 1){
-                        sent.map( s => console.log('sent notification to ',s.device+' on '+new Date().toLocaleString()));
-                    }
-                    if(failed && failed.length >= 1){
-                        failed.map( f => console.log('failed to send notification to ',f.device+' on '+new Date().toLocaleString()));
-                    }
-                    apnProvider.shutdown();
+        if(deviceType === 1){
+            if(deviceToken !== '' || deviceToken !== undefined){
+                //const deviceType = (deviceType !== undefined || deviceType !=='' ) ? deviceType : 1;
+                sendNotification(deviceToken)
+                    .then( (results) => {
+                        console.log('results', results);
+                        const sent = results.sent;
+                        const failed = results.failed;
+                        if(sent && sent.length >= 1){
+                            sent.map( s => console.log('sent notification to ',s.device+' on '+new Date().toLocaleString()));
+                        }
+                        if(failed && failed.length >= 1){
+                            failed.map( f => console.log('failed to send notification to ',f.device+' on '+new Date().toLocaleString()));
+                        }
+                        apnProvider.shutdown();
+                        const response = {
+                            statusCode : 200,
+                            body: JSON.stringify({
+                                message : 'Push Client executed successfully!'
+                            })
+                        };
+                        callback(null,response);
+                    })
+            }else {
+                const response = {
+                    statusCode: 301,
+                    body: JSON.stringify({
+                        message: 'Check device Token param',
+                        payload: event.params,
+                    }),
+                };
+                callback(null,response);
+            }
+        }else{
+            let token;
+            if(deviceToken === ''){
+                token = 'fS8CnyL0QUk:APA91bEfjfkVB7Jo5l_iUUFkfS3A2OiUcM73Cy86qrBeoP6tFWQJsVyzSWnQTOvmjxx8ZpRxr8zrb9FDFXDS8-LZ4tl26AMK0j48UcHV5F6p4piOO-9Gpj01K06VKdMj9MVa7max6c6H';
+            }else{
+                token = deviceToken;
+            }
+            GcmClient.send(token)
+                .then( () => {
                     const response = {
                         statusCode : 200,
                         body: JSON.stringify({
@@ -51,15 +81,16 @@ module.exports.pushNotificationToTechWithToken = (event, context, callback) => {
                     };
                     callback(null,response);
                 })
-        }else {
-            const response = {
-                statusCode: 301,
-                body: JSON.stringify({
-                    message: 'Check device Token param',
-                    payload: event.params,
-                }),
-            };
-            callback(null,response);
+                .catch( (error) => {
+                    const response = {
+                        statusCode: 301,
+                        body: JSON.stringify({
+                            message: error,
+                            payload: event.params,
+                        }),
+                    };
+                    callback(null,response);
+                });
         }
     }catch (e){
         const response = {
